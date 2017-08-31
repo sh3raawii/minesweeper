@@ -19,9 +19,7 @@ class MineSweeperGame(ScreenManager):
         self.game_screen = GameScreen(name='game')
         self.score_screen = ScoreScreen(name='score')
 
-        self.game_screen.init(5, 5, 3)
-
-        # self.add_widget(self.intro_screen)
+        self.add_widget(self.intro_screen)
         self.add_widget(self.game_screen)
         self.add_widget(self.score_screen)
 
@@ -48,27 +46,19 @@ class IntroScreen(Screen):
         self.add_widget(self.my_root_widget)
 
     def start_game(self, _):
-        print("Play Button Was clicked")
-        print("Length: " + self.length_input.text)
-        print("Width: " + self.width_input.text)
-        print("Bombs Count: " + self.bombs_count_input.text)
         length = self.length_input.text
         width = self.width_input.text
         bombs_count = self.bombs_count_input.text
+        # validating user input
         if not length.isnumeric() or not width.isnumeric() or not bombs_count.isnumeric() \
                 or int(length) <= 0 or int(width) <= 0 or int(bombs_count) <= 0:
             return
         length = int(length)
         width = int(width)
         bombs_count = int(bombs_count)
+        # init game screen and set as current
         game_screen_name = 'game'
         game_screen = self.manager.get_screen(game_screen_name)
-
-        # testing
-        # print(type(length), length)
-        # print(type(width), width)
-        # game_screen.init(6, 6)
-
         game_screen.init(length, width, bombs_count)
         self.manager.current = game_screen_name
 
@@ -88,32 +78,29 @@ class GameScreen(Screen):
     def init(self, length, width, bombs_count):
         self.rows = length
         self.cols = width
-        self.remaining_tiles_count = width * length
+        self.remaining_tiles_count = self.cols * self.rows
         # create root layout
-        self.my_root_widget = GridLayout(cols=width, rows=length)
+        self.my_root_widget = GridLayout(cols=self.cols, rows=self.rows)
         # generate the random bombs
         self.bombs_count = bombs_count
-        bombs = list(range(width * length))
+        bombs = list(range(self.cols * self.rows))
         random.shuffle(bombs)
         bombs = bombs[:self.bombs_count]
-
-        # testing
-        print("Bomb locations: " + " ".join(map(str, bombs)))
-
         # create list of tiles
-        self.tile_list = [Tile(self, i) for i in range(width * length)]
+        self.tile_list = [Tile(self, i) for i in range(self.cols * self.rows)]
+        # setting the bombs
         for bomb_index in bombs:
             # set tile as bomb
             self.tile_list[bomb_index].set_bomb()
             # increment the number of the neighbour tiles
-            top, bottom, left, right = bomb_index-1, bomb_index+1, bomb_index-length, bomb_index+length
-            if top >= 0 and top % self.rows != self.rows - 1:
+            left, right, top, bottom = bomb_index-1, bomb_index+1, bomb_index-self.cols, bomb_index+self.cols
+            if top >= 0:
                 self.tile_list[top].number += 1
-            if bottom <= width * length-1 and bottom % self.rows != 0:
+            if bottom <= len(self.tile_list) - 1:
                 self.tile_list[bottom].number += 1
-            if left >= 0:
+            if left >= 0 and left % self.cols != self.cols - 1:
                 self.tile_list[left].number += 1
-            if right <= width * length - 1:
+            if right <= len(self.tile_list) - 1 and right % self.cols != 0:
                 self.tile_list[right].number += 1
         # populate the layout
         for tile in self.tile_list:
@@ -130,17 +117,17 @@ class GameScreen(Screen):
         if self.tile_list[index].is_bomb():
             # user lost the game
             game_screen = self.manager.get_screen(score_screen_name)
-            game_screen.init_lost_screen(time.time() - self.start_time)
+            game_screen.init_lost_screen(int(time.time() - self.start_time))
             self.manager.current = score_screen_name
         else:
-            self.expand(self.tile_list[index], self.rows, root=True)
+            self.expand(self.tile_list[index], root=True)
             if self.remaining_tiles_count == self.bombs_count:
                 # user won the game
                 game_screen = self.manager.get_screen(score_screen_name)
-                game_screen.init_win_screen(time.time() - self.start_time)
+                game_screen.init_win_screen(int(time.time() - self.start_time))
                 self.manager.current = score_screen_name
 
-    def expand(self, tile, length, root=False):
+    def expand(self, tile, root=False):
         if tile.is_visited():
             return
         elif tile.is_neighbour() and not root:
@@ -153,15 +140,15 @@ class GameScreen(Screen):
             tile.set_visited()
             self.remaining_tiles_count -= 1
             index = tile.get_tile_index()
-            top, bottom, left, right = index-1, index+1, index-length, index+length
-            if top >= 0 and top % self.rows != self.rows - 1 and not self.tile_list[top].is_bomb():
-                self.expand(self.tile_list[top], length)
-            if bottom <= self.cols * length-1 and bottom % self.rows != 0 and not self.tile_list[bottom].is_bomb():
-                self.expand(self.tile_list[bottom], length)
-            if left >= 0 and not self.tile_list[left].is_bomb():
-                self.expand(self.tile_list[left], length)
-            if right <= self.cols * length - 1 and not self.tile_list[right].is_bomb():
-                self.expand(self.tile_list[right], length)
+            left, right, top, bottom = index-1, index+1, index-self.cols, index+self.cols
+            if top >= 0 and not self.tile_list[top].is_bomb():
+                self.expand(self.tile_list[top])
+            if bottom <= len(self.tile_list) - 1 and not self.tile_list[bottom].is_bomb():
+                self.expand(self.tile_list[bottom])
+            if left >= 0 and left % self.cols != self.cols - 1 and not self.tile_list[left].is_bomb():
+                self.expand(self.tile_list[left])
+            if right <= len(self.tile_list) - 1 and right % self.cols != 0 and not self.tile_list[right].is_bomb():
+                self.expand(self.tile_list[right])
 
 
 class Tile(Button):
@@ -207,13 +194,13 @@ class ScoreScreen(Screen):
     def init_lost_screen(self, score):
         my_root_layout = BoxLayout(spacing=10, padding=200, orientation='vertical')
         my_root_layout.add_widget(Label(text="YOU LOST"))
-        my_root_layout.add_widget(Label(text="Your Score is " + str(score)))
+        my_root_layout.add_widget(Label(text="Your Score Is " + str(score) + " Seconds"))
         self.add_widget(my_root_layout)
 
     def init_win_screen(self, score):
         my_root_layout = BoxLayout(spacing=10, padding=200, orientation='vertical')
         my_root_layout.add_widget(Label(text="Congrats"))
-        my_root_layout.add_widget(Label(text="You Finished Them All In " + str(score)))
+        my_root_layout.add_widget(Label(text="You Finished Them All In " + str(score) + " Seconds"))
         self.add_widget(my_root_layout)
 
 
